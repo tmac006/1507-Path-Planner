@@ -1,68 +1,47 @@
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Cursor
-import matplotlib.image as mpimg
+import tkinter as tk
+from tkinter import filedialog
+from PIL import Image, ImageTk
+import math
 
-def main():
-    # Load image
-    image_path = input("Enter the path to the image: ")
-    img = mpimg.imread(image_path)
+# Function to calculate distance between two points
+def calculate_distance(x0, y0, x1, y1):
+    return math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
 
-    # Display image
-    fig, ax = plt.subplots()
-    ax.imshow(img)
-    plt.gca().invert_yaxis()  # Invert y-axis to match image coordinates
+class ImageDistanceApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Image Distance Calculator")
 
-    # Set up cursor
-    cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
+        self.canvas = tk.Canvas(root, width=7680, height=3320)
+        self.canvas.pack()
 
-    # Set the pixel scale factor (1 inch corresponds to 224 pixels)
-    pixel_scale_factor = 1 / 224
+        self.load_image_button = tk.Button(root, text="Load Image", command=self.load_image)
+        self.load_image_button.pack()
 
-    # Set the inches scale factor (0.75 inches corresponds to 57 inches in reality)
-    inches_scale_factor = 57 / 0.75
-
-    # Calculate the actual scale factor
-    actual_scale_factor = 195 / 367  # Adjusted 
-
-    # Initialize variables
-    origin = None
-    prev_point = None
-
-    def onclick(event):
-        nonlocal origin, prev_point
+        self.reference_points = []
+        self.canvas.bind("<Button-1>", self.set_point)
         
-        x = event.xdata
-        y = event.ydata
+    def load_image(self):
+        file_path = filedialog.askopenfilename()
+        if file_path:
+            self.image = Image.open(file_path)
+            self.image.thumbnail((7680, 3320))
+            self.photo = ImageTk.PhotoImage(self.image)
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
 
-        if origin is None:
-            # First point clicked is considered the origin
-            origin = (x, y)
-            prev_point = origin
-            plt.plot(x, y, 'bo', markersize=5)  # Plot the origin point
+    def set_point(self, event):
+        if not self.reference_points:
+            self.reference_points.append((event.x, event.y))
+            self.canvas.create_oval(event.x - 3, event.y - 3, event.x + 3, event.y + 3, fill='red')
+            self.canvas.create_text(event.x, event.y - 10, text="(0,0)", fill="red")
         else:
-            # Plot line from previous point to current point
-            plt.plot([prev_point[0], x], [prev_point[1], y], color='blue')
-            prev_point = (x, y)
-
-        # Convert pixel coordinates to inches relative to the origin
-        inches_y_pixel = (x - origin[0]) * pixel_scale_factor
-        inches_x_pixel = (y - origin[1]) * pixel_scale_factor  # Swap x and y
-
-        # Convert inches relative to the origin to inches based on the new scale factor
-        inches_x = inches_x_pixel * inches_scale_factor * actual_scale_factor
-        inches_y = inches_y_pixel * inches_scale_factor * actual_scale_factor
-
-        # Flip the sign of inches_x if it's positive
-        inches_x = -inches_x if inches_x > 0 else inches_x
-
-        print(f"Inches from origin: ({inches_x:.2f}, {inches_y:.2f}) inches")
-
-        plt.draw()
-
-    # Connect click event to function
-    cid = fig.canvas.mpl_connect('button_press_event', onclick)
-
-    plt.show()
+            prev_x, prev_y = self.reference_points[-1]
+            distance = calculate_distance(prev_x, prev_y, event.x, event.y)
+            self.canvas.create_line(prev_x, prev_y, event.x, event.y, fill="blue")
+            self.canvas.create_text(event.x, event.y, text=f"{distance:.2f}", fill="blue")
+            self.reference_points.append((event.x, event.y))
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = ImageDistanceApp(root)
+    root.mainloop()
